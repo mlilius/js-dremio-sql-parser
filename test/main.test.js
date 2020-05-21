@@ -1,6 +1,6 @@
 'use strict';
 
-const debug = require('debug')('js-sql-parser');
+const debug = require('debug')('js-dremio-sql-parser');
 const parser = require('../');
 
 const testParser = function(sql) {

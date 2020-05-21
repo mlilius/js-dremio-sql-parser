@@ -1,6 +1,6 @@
 {
-  "name": "js-sql-parser",
-  "version": "1.3.0",
+  "name": "js-dremio-sql-parser",
+  "version": "1.4.0",
   "description": "",
   "main": "./dist/parser/sqlParser.js",
   "scripts": {
@@ -13,7 +13,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/JavaScriptor/js-sql-parser.git"
+    "url": "git+https://github.com/mlilius/js-dremio-sql-parser.git"
   },
   "keywords": [
     "js",
@@ -22,9 +22,9 @@
   "author": "albin zeng",
   "license": "ISC",
   "bugs": {
-    "url": "https://github.com/JavaScriptor/js-sql-parser/issues"
+    "url": "https://github.com/mlilius/js-dremio-sql-parser/issues"
   },
-  "homepage": "https://github.com/JavaScriptor/js-sql-parser#readme",
+  "homepage": "https://github.com/mlilius/js-dremio-sql-parser#readme",
   "devDependencies": {
     "babel-preset-es2015": "^6.22.0",
     "babel-register": "^6.22.0",
