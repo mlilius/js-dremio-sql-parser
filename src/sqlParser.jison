@@ -1,5 +1,8 @@
-/* description: Parses SQL */
+/* description: Parses Dremio SQL */
 /* :tabSize=4:indentSize=4:noTabs=true: */
+/* Based on https://github.com/christyharagan/dremio-node-api */
+/* Based on https://github.com/JavaScriptor/js-sql-parser */
+/* Original License: ISC, albin zeng, 9 Feb 2018 */
 %lex
 
 %options case-insensitive
@@ -7,12 +10,15 @@
 %%
 
 [/][*](.|\n)*?[*][/]                                              /* skip comments */
-[-][-]\s.*\n                                                      /* skip sql comments */
+[-][-].*\n?                                                       /* skip sql comments */
 [#]\s.*\n                                                         /* skip sql comments */
 \s+                                                               /* skip whitespace */
 
 [`][a-zA-Z_\u4e00-\u9fa5][a-zA-Z0-9_\u4e00-\u9fa5]*[`]            return 'IDENTIFIER'
 [\w]+[\u4e00-\u9fa5]+[0-9a-zA-Z_\u4e00-\u9fa5]*                   return 'IDENTIFIER'
+\.\*                                                              return 'IDENTIFIER'
+["](?:[^"\\]|\\.)*["](?:\[\d+\])?                                 return 'IDENTIFIER'
+[`](?:[^`\\]|\\.)*[`](?:\[\d+\])?                                 return 'IDENTIFIER'
 [\u4e00-\u9fa5][0-9a-zA-Z_\u4e00-\u9fa5]*                         return 'IDENTIFIER'
 SELECT                                                            return 'SELECT'
 ALL                                                               return 'ALL'
@@ -50,25 +56,29 @@ IN                                                                return 'IN'
 SOUNDS                                                            return 'SOUNDS'
 LIKE                                                              return 'LIKE'
 ESCAPE                                                            return 'ESCAPE'
+CAST                                                              return 'CAST'
+OVER                                                              return 'OVER'
 REGEXP                                                            return 'REGEXP'
 IS                                                                return 'IS'
 UNKNOWN                                                           return 'UNKNOWN'
 AND                                                               return 'AND'
 OR                                                                return 'OR'
+INTERVAL                                                          return 'INTERVAL'
 XOR                                                               return 'XOR'
 FROM                                                              return 'FROM'
-PARTITION                                                         return 'PARTITION'
+PARTITION\s(?!BY)                                                 return 'PARTITION'
 USE                                                               return 'USE'
 INDEX                                                             return 'INDEX'
-KEY                                                               return 'KEY'
 FOR                                                               return 'FOR'
 JOIN                                                              return 'JOIN'
+PARTITION\s+BY                                                    return 'PARTITION_BY'
 ORDER\s+BY                                                        return 'ORDER_BY'
 GROUP\s+BY                                                        return 'GROUP_BY'
 IGNORE                                                            return 'IGNORE'
 FORCE                                                             return 'FORCE'
 INNER                                                             return 'INNER'
 CROSS                                                             return 'CROSS'
+FULL                                                              return 'FULL'
 ON                                                                return 'ON'
 USING                                                             return 'USING'
 LEFT                                                              return 'LEFT'
@@ -91,6 +101,29 @@ OJ                                                                return 'OJ'
 LIMIT                                                             return 'LIMIT'
 UNION                                                             return 'UNION'
 
+MICROSECOND                                                       return 'MICROSECOND'
+SECOND                                                            return 'SECOND'
+MINUTE                                                            return 'MINUTE'
+HOUR                                                              return 'HOUR'
+DAY                                                               return 'DAY'
+WEEK                                                              return 'WEEK'
+MONTH                                                             return 'MONTH'
+/* TODO: we need to make this handle field names of quarter
+QUARTER                                                           return 'QUARTER'*/
+YEAR                                                              return 'YEAR'
+SECOND_MICROSECOND                                                return 'SECOND_MICROSECOND'
+MINUTE_MICROSECOND                                                return 'MINUTE_MICROSECOND'
+MINUTE_SECOND                                                     return 'MINUTE_SECOND'
+HOUR_MICROSECOND                                                  return 'HOUR_MICROSECOND'
+HOUR_SECOND                                                       return 'HOUR_SECOND'
+HOUR_MINUTE                                                       return 'HOUR_MINUTE'
+DAY_MICROSECOND                                                   return 'DAY_MICROSECOND'
+DAY_SECOND                                                        return 'DAY_SECOND'
+DAY_MINUTE                                                        return 'DAY_MINUTE'
+DAY_HOUR                                                          return 'DAY_HOUR'
+YEAR_MONTH                                                        return 'YEAR_MONTH'
+
+/* "'"                                                            return 'SINGLE_QUOTE' */
 ","                                                               return ','
 "="                                                               return '='
 "("                                                               return '('
@@ -124,11 +157,10 @@ UNION                                                             return 'UNION'
 [-]?[0-9]+(\.[0-9]+)?                                             return 'NUMERIC'
 [-]?[0-9]+(\.[0-9]+)?[eE][-][0-9]+(\.[0-9]+)?                     return 'EXPONENT_NUMERIC'
 
-[a-zA-Z_\u4e00-\u9fa5][a-zA-Z0-9_\u4e00-\u9fa5]*                  return 'IDENTIFIER'
+[\$a-zA-Z_\u4e00-\u9fa5][a-zA-Z0-9_\u4e00-\u9fa5:]*(?:\[\d+\])?   return 'IDENTIFIER'
 \.                                                                return 'DOT'
-['"][a-zA-Z_\u4e00-\u9fa5][a-zA-Z0-9_\u4e00-\u9fa5]*["']          return 'QUOTED_IDENTIFIER'
-[`].+[`]                                                          return 'QUOTED_IDENTIFIER'
-
+['"][@a-zA-Z_\u4e00-\u9fa5][a-zA-Z0-9_\u4e00-\u9fa5]*["']         return 'QUOTED_IDENTIFIER'
+                                                                 
 <<EOF>>                                                           return 'EOF'
 .                                                                 return 'INVALID'
 
@@ -139,8 +171,8 @@ UNION                                                             return 'UNION'
 %nonassoc PARTITION
 %left INDEX_HINT_LIST
 %left INDEX_HINT_COMMA
-%left INNER_CROSS_JOIN_NULL LEFT_RIGHT_JOIN
-%left INNER_CROSS_JOIN
+%left INNER_CROSS_JOIN_NULL_FULL LEFT_RIGHT_JOIN
+%left INNER_CROSS_JOIN_FULL
 %right USING
 %right ON
 %left OR XOR '||'
@@ -228,6 +260,40 @@ selectClause
       }
   ;
 
+intervalExpr
+  : INTERVAL intervalNumeric timePeriod { $$ = { type: 'Interval', duration: $2, period: $3 } }
+  ;
+
+intervalNumeric
+  : NUMERIC { $$ = $1 }
+  | EXPONENT_NUMERIC { $$ = $1 }
+  | HEX_NUMERIC { $$ = $1 }
+  | STRING { $$ = $1 }
+  ;
+
+timePeriod
+  : MICROSECOND { $$ = $1 }
+  | SECOND { $$ = $1 }
+  | MINUTE { $$ = $1 }
+  | HOUR { $$ = $1 }
+  | DAY { $$ = $1 }
+  | WEEK { $$ = $1 }
+  | MONTH { $$ = $1 }
+  | QUARTER { $$ = $1 }
+  | YEAR { $$ = $1 }
+  | SECOND_MICROSECOND { $$ = $1 }
+  | MINUTE_MICROSECOND { $$ = $1 }
+  | MINUTE_SECOND { $$ = $1 }
+  | HOUR_MICROSECOND { $$ = $1 }
+  | HOUR_SECOND { $$ = $1 }
+  | HOUR_MINUTE { $$ = $1 }
+  | DAY_MICROSECOND { $$ = $1 }
+  | DAY_SECOND { $$ = $1 }
+  | DAY_MINUTE { $$ = $1 }
+  | DAY_HOUR { $$ = $1 }
+  | YEAR_MONTH { $$ = $1 }
+  ;
+
 distinctOpt
   : ALL { $$ = $1 }
   | DISTINCT { $$ = $1 }
@@ -280,8 +346,6 @@ selectExprAliasOpt
   : { $$ = {alias: null, hasAs: null} }
   | AS IDENTIFIER { $$ = {alias: $2, hasAs: true} }
   | IDENTIFIER { $$ = {alias: $1, hasAs: false} }
-  | AS QUOTED_IDENTIFIER { $$ = {alias: $2, hasAs: true} }
-  | QUOTED_IDENTIFIER { $$ = {alias: $1, hasAs: false} }
   ;
 
 string
@@ -307,7 +371,7 @@ literal
   | null { $$ = $1 }
   ;
 function_call
-  : IDENTIFIER '(' function_call_param_list ')' { $$ = {type: 'FunctionCall', name: $1, params: $3} }
+  : IDENTIFIER '(' function_call_param_list ')' over_opt { $$ = {type: 'FunctionCall', name: $1, params: $3, overOpt: $5} }
   ;
 function_call_param_list
   : function_call_param_list ',' function_call_param { $1.push($3); $$ = $1; }
@@ -318,7 +382,11 @@ function_call_param
   | '*' { $$ = $1 }
   | SELECT_EXPR_STAR { $$ = $1 }
   | DISTINCT expr { $$ = { type: 'FunctionCallParam', distinctOpt: $1, value: $2 } }
+  | expr FROM expr { $$ = { type: 'FromCallParam', left: $1, right: $3 } }
+  | timePeriod FROM expr { $$ = { type: 'TimePeriodFromCallParam', left: $1, right: $3 } }
   | expr { $$ = $1 }
+  | expr AS expr { $$ = { type: 'ASExpression', left: $1, right: $3 } }
+  | timePeriod
   ;
 identifier
   : IDENTIFIER { $$ = { type: 'Identifier', value: $1 } }
@@ -343,6 +411,15 @@ case_when_else
 case_when
   : CASE case_expr_opt when_then_list case_when_else END { $$ = { type: 'CaseWhen', caseExprOpt: $2, whenThenList: $3, else: $4 } }
   ;
+cast
+  : CAST '(' expr AS IDENTIFIER ')' { $$ = { type: 'Cast', expr: $3, castTo: $5 } }
+  | CAST '(' expr AS INTERVAL timePeriod ')' { $$ = { type: 'CastInterval', expr: $3, castTo: $6 } }
+  | CAST '(' expr AS function_call ')' { $$ = { type: 'CastFunction', expr: $3, castTo: $5 } }
+  ;
+over_opt
+  : { $$ = null }
+  | OVER '(' partition_by_opt order_by_opt ')' { $$ = { type: 'Over', partitionBy: $3, orderBy: $4 } }
+  ;
 simple_expr_prefix
   : '+' simple_expr %prec UPLUS { $$ = { type: 'Prefix', prefix: $1, value: $2 } }
   | '-' simple_expr %prec UMINUS { $$ = { type: 'Prefix', prefix: $1, value: $2 } }
@@ -352,6 +429,7 @@ simple_expr_prefix
   ;
 simple_expr
   : literal { $$ = $1 }
+  | intervalExpr { $$ = $1 }
   | identifier { $$ = $1 }
   | function_call { $$ = $1 }
   | simple_expr_prefix { $$ = $1 }
@@ -361,6 +439,7 @@ simple_expr
   | EXISTS '(' selectClause ')' { $$ = { type: 'SubQuery', value: $3, hasExists: true } }
   | '{' identifier expr '}' { $$ = { type: 'IdentifierExpr', identifier: $2, value: $3 } }
   | case_when { $$ = $1 }
+  | cast { $$ = $1 }
   ;
 bit_expr
   : simple_expr { $$ = $1 }
@@ -447,6 +526,13 @@ roll_up_opt
 group_by
   : GROUP_BY group_by_order_by_item_list roll_up_opt { $$ = { type: 'GroupBy', value: $2, rollUp: $3 } }
   ;
+partition_by_opt
+  : { $$ = null }
+  | partition_by { $$ = $1 }
+  ;
+partition_by
+  : PARTITION_BY group_by_order_by_item_list { $$ = { type: 'PartitionBy', value: $2 } }
+  ;
 order_by_opt
   : { $$ = null }
   | order_by { $$ = $1 }
@@ -503,11 +589,13 @@ table_references
 escaped_table_reference
   : table_reference { $$ = { type: 'TableReference', value: $1 } }
   | '{' OJ table_reference '}' { $$ = { type: 'TableReference', hasOj: true, value: $3 } }
+  | STRING { $$ = { type: 'TableReference', value: $1 } }
   ;
 join_inner_cross
   : { $$ = null }
   | INNER { $$ = $1 }
   | CROSS { $$ = $1 }
+  | FULL { $$ = $1 }
   ;
 left_right
   : LEFT { $$ = $1 }
@@ -522,8 +610,8 @@ left_right_out_opt
   | left_right out_opt { $$ = { leftRight: $1, outOpt: $2 } }
   ;
 join_table
-  : table_reference join_inner_cross JOIN table_factor %prec INNER_CROSS_JOIN_NULL { $$ = { type: 'InnerCrossJoinTable', innerCrossOpt: $2, left: $1, right: $4, condition: null } }
-  | table_reference join_inner_cross JOIN table_factor join_condition  %prec INNER_CROSS_JOIN { $$ = { type: 'InnerCrossJoinTable', innerCrossOpt: $2, left: $1, right: $4, condition: $5 } }
+  : table_reference join_inner_cross JOIN table_factor %prec INNER_CROSS_JOIN_NULL_FULL { $$ = { type: 'InnerCrossJoinTable', innerCrossOpt: $2, left: $1, right: $4, condition: null } }
+  | table_reference join_inner_cross JOIN table_factor join_condition  %prec INNER_CROSS_JOIN_FULL { $$ = { type: 'InnerCrossJoinTable', innerCrossOpt: $2, left: $1, right: $4, condition: $5 } }
   | table_reference STRAIGHT_JOIN table_factor on_join_condition { $$ = { type: 'StraightJoinTable', left: $1, right: $3, condition: $4 } }
   | table_reference left_right out_opt JOIN table_reference join_condition %prec LEFT_RIGHT_JOIN { $$ = { type: 'LeftRightJoinTable', leftRight: $2, outOpt: $3, left: $1, right: $5, condition: $6 } }
   | table_reference NATURAL left_right_out_opt JOIN table_factor { $$ = { type: 'NaturalJoinTable', leftRight: $3.leftRight, outOpt: $3.outOpt, left: $1, right: $5 } }
