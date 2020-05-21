@@ -28,38 +28,8 @@ ast.value.selectItems.value[0].value = 'foo';
 ast.value.from.value[0].value.value.value = 'bar';
 
 console.log(parser.stringify(ast));
-// TODO
 // SELECT foo FROM bar
 ```
-
-## script tag
-
-```js
-<script src="./dist/parser/sqlParser.js"><script/>
-
-var sqlParser = window.sqlParser;
-var ast = sqlParser.parse('SELECT * FROM Samples."samples.dremio.com"."zips.json"');
-var sql = sqlParser.stringify(ast);
-```
-
-## AMD supported
-
-...
-
-## unsupported grammar currently
-
-- Hexadecimal Literals as x'01af' X'01af', but 0x01af is supported.
-- keyword COLLATE.
-- parammarker: keyword PREPARE / EXECUTE / DEALLOCATE
-- variable: keyword SET / CREATE PROCEDURE / CREATE FUNCTION
-- identifier expr: ODBC escape syntax
-- matchexpr: Full-Text Search Functions. // to support
-- intervalexpr: Date INTERVAL keyword.   // to support
-- into outfile: INTO OUTFILE keyword.    // to support
-
-## TODO
-
-- ${value} like value place holder support.
 
 ## Build
 
