@@ -6,12 +6,20 @@ const parser = require('../');
 const testParser = function(sql) {
   let firstAst = parser.parse(sql);
   debug(JSON.stringify(firstAst, null, 2));
-  let firstSql = parser.stringify(firstAst);
+  let firstSql = parser.stringify(firstAst).trim();
   debug(firstSql);
   let secondAst = parser.parse(firstSql);
   debug(parser.stringify(secondAst));
-  let secondSql = parser.stringify(secondAst);
+  let secondSql = parser.stringify(secondAst).trim();
   debug(JSON.stringify(secondAst, null, 2));
+
+  const originalSql = sql.toLowerCase().replace(/[/][*](.|\n)*?[*][/]/g, '').replace(/[#]\s.*\n/g, '').replace(/[-][-].*\n?/g, '').replace(/\n/g, ' ').replace(/\s*/g, '');
+  const generatedSql = firstSql.toLowerCase().replace(/\s*/g, '');
+  if (originalSql !== generatedSql) {
+    console.log('original_Sql:', originalSql);
+    console.log('generatedSql:', generatedSql);
+    throw "err originalSql don't equals generatedSql. ";
+  }
 
   if (firstSql !== secondSql) {
     console.log('firstSql', firstSql);
