@@ -3,7 +3,6 @@
   "version": "1.0.0",
   "description": "Dremio SQL(select) parser written with jison. Parse SQL into abstract syntax tree(AST) and stringify back to SQL. SQL grammar follows https://docs.dremio.com/sql-reference/",
   "main": "./dist/parser/sqlParser.js",
-  "publishConfig": {"registry": "https://npm.pkg.github.com/"},
   "scripts": {
     "build": "jison -m js ./src/sqlParser.jison -o ./dist/parser/sqlParser.js && npm run build-concat",
     "build-concat": "minicat src/stringify.js src/suffix.js >> dist/parser/sqlParser.js",
@@ -20,7 +19,7 @@
     "js",
     "sql-parser"
   ],
-  "author": "albin zeng",
+  "author": "Matthew Lilius",
   "license": "ISC",
   "bugs": {
     "url": "https://github.com/mlilius/js-dremio-sql-parser/issues"
