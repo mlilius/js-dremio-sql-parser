@@ -9,3 +9,4 @@
 1.2.2 PRE-FORK feat: add support for "`" quoted alias, pr: #33
 1.3.0 PRE-FORK fix tableFactor alias bug. AST changed in tableFactor. #34
 1.0.0 fork from mysql grammar to dremio grammar
+1.0.1 fix for sub query UNION
