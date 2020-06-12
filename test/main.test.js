@@ -419,4 +419,22 @@ describe('select grammar support', function() {
   it('bugfix table alias2', function() {
     testParser('select a.* from a t1 join b t2 on t1.a = t2.a')
   })
+
+  it('UNION ALL sub query', function() {
+    testParser(`
+    SELECT
+    col
+    FROM(
+      SELECT
+      col
+      FROM tableA
+  
+      UNION ALL
+  
+      SELECT
+      col
+      FROM tableB
+    )
+    `)
+  })
 });

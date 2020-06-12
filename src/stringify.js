@@ -14,16 +14,16 @@ if (!sqlParser) {
   
   Sql.prototype.travel = function(ast) {
     if (!ast) return;
-  
+
     if (typeof ast === 'string') {
       return this.append(ast);
     }
-  
+
     var processor = this['travel' + ast.type];
     try {
       processor.call(this, ast);
     } catch (error) {
-      throw new Error(error)
+      throw new Error(`Error when trying to process travel${ast.type}:`, error)
     }
   };
   
@@ -291,6 +291,9 @@ if (!sqlParser) {
     this.append('(', false, true);
     this.travel(ast.value);
     this.append(')', true);
+  };
+  Sql.prototype.travelSelectUnion = function(ast) {
+    this.travel(ast.value);
   };
   Sql.prototype.travelIdentifierExpr = function(ast) {
     this.append('{');

@@ -197,6 +197,11 @@ main
   | unionClause semicolonOpt EOF { return {nodeType: 'Main', value: $1, hasSemicolon: $2}; }
   ;
 
+selectUnionClause
+  : selectClause { $$ = {type: 'SelectUnion', value: $1}; }
+  | unionClause { $$ = {type: 'SelectUnion', value: $1}; }
+  ;
+
 semicolonOpt
   : ';' { $$ = true }
   | { $$ = false }
@@ -673,6 +678,6 @@ index_hint
   ;
 table_factor
   : identifier partitionOpt aliasOpt index_hint_list_opt { $$ = { type: 'TableFactor', value: $1, partition: $2, alias: $3.alias, hasAs: $3.hasAs, indexHintOpt: $4 } }
-  | '(' selectClause ')' aliasOpt { $$ = { type: 'TableFactor', value: { type: 'SubQuery', value: $2 }, alias: $4.alias, hasAs: $4.hasAs} }
+  | '(' selectUnionClause ')' aliasOpt { $$ = { type: 'TableFactor', value: { type: 'SubQuery', value: $2 }, alias: $4.alias, hasAs: $4.hasAs} }
   | '(' table_references ')' { $$ = $2; $$.hasParentheses = true }
   ;
